@@ -47,7 +47,9 @@ enum class ModType(val tag: String)
     FLAGS("Graphics"),
     PRESCRIPTED_COUNTRIES("Galaxy Generation"),
     ASCENSION_PERKS("Government"),
-    CIVICS("Government")
+    CIVICS("Government"),
+    TECHNOLOGY("Tech"),
+    NAME_LISTS("Species")
 }
 
 class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModType> = mutableSetOf(), val uniqueID: UUID = UUID.randomUUID())
@@ -188,6 +190,8 @@ interface ModComponent
                 ModType.PRESCRIPTED_COUNTRIES -> TODO()
                 ModType.ASCENSION_PERKS -> TODO()
                 ModType.CIVICS -> TODO()
+                ModType.TECHNOLOGY -> TODO()
+                ModType.NAME_LISTS -> TODO()
             }
         }
         
@@ -216,6 +220,8 @@ interface ModComponent
                 ModType.PRESCRIPTED_COUNTRIES -> TODO()
                 ModType.ASCENSION_PERKS -> TODO()
                 ModType.CIVICS -> TODO()
+                ModType.TECHNOLOGY -> TODO()
+                ModType.NAME_LISTS -> TODO()
             }
         }
     }

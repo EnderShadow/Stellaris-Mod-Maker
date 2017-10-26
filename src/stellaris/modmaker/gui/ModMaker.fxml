@@ -74,12 +74,12 @@
                                                 <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
                                              </VBox.margin>
                                           </TextField>
-                                          <TextField fx:id="modFolder" promptText="Mod Folder Name">
+                                          <TextField fx:id="modFolder" promptText="Mod Folder Name (Optional)">
                                              <VBox.margin>
                                                 <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
                                              </VBox.margin>
                                           </TextField>
-                                          <TextField fx:id="modID" promptText="Steam Mod ID">
+                                          <TextField fx:id="modID" promptText="Steam Mod ID (Optional)">
                                              <VBox.margin>
                                                 <Insets bottom="5.0" left="10.0" right="10.0" top="5.0" />
                                              </VBox.margin>
@@ -149,6 +149,8 @@
                   <Tab closable="false" text="Prescripted Countries" />
                   <Tab closable="false" text="Ascension Perks" />
                   <Tab closable="false" text="Civics" />
+                  <Tab closable="false" text="Technology" />
+                  <Tab closable="false" text="Name Lists" />
               </tabs>
             </TabPane>
          </children>

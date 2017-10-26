@@ -70,6 +70,19 @@ class Controller
             removeMenu.items.add(menuItem)
         }
         
+        // disable unimplemented mod types
+        ModType.values().forEach {
+            try
+            {
+                ModComponent.createComponent(it, Mod(""))
+            }
+            catch(error: NotImplementedError)
+            {
+                addMenu.items.find {item -> item.text.toUpperCase().replace(' ', '_') == it.toString()}!!.isDisable = true
+            }
+            finally {} // ignore other exceptions (They aren't important here)
+        }
+        
         imageBorderStyle = image.parent.style
     
         modName.textProperty().addListener({_, _, new -> currentMod.name = new})
