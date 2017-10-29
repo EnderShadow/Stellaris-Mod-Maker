@@ -1,7 +1,5 @@
 package json
 
-import java.math.BigInteger
-
 class JSONObject(map: Map<String, Any?> = emptyMap()): LinkedHashMap<String, Any?>(map)
 {
     fun string(key: String) = this[key] as String?

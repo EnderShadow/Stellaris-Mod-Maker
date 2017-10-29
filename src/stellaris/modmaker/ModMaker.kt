@@ -200,7 +200,6 @@ interface ModComponent
             val type = ModType.valueOf(obj.string("type")!!)
             return when(type)
             {
-    
                 ModType.SPECIES -> TODO()
                 ModType.MUSIC -> {
                     val musicComponent = MusicComponent(mod)
@@ -236,9 +235,9 @@ class MusicComponent(val mod: Mod): ModComponent
 {
     override val type = ModType.MUSIC
     
-    val songs = FXCollections.observableArrayList<Song>()
+    val songs = FXCollections.observableArrayList<Song>()!!
     
-    val path get() = "music/${mod.folderName}"
+    private val path get() = "music/${mod.folderName}"
     
     data class Song(val songLocation: File, var songName: String = songLocation.nameWithoutExtension, var volume: Double = 0.5)
     

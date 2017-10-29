@@ -18,12 +18,12 @@ object JSONParser
         {
             if(!json[index].isWhitespace())
             {
-                if(json[index] == '{')
-                    return parseObject(json, index).first
-                else if(json[index] == '[')
-                    return parseArray(json, index).first
-                else
-                    throw IllegalArgumentException("Malformed JSON")
+                return when(json[index])
+                {
+                    '{' -> parseObject(json, index).first
+                    '[' -> parseArray(json, index).first
+                    else -> throw IllegalArgumentException("Malformed JSON")
+                }
             }
             index++
         }

@@ -1,6 +1,5 @@
 package stellaris.modmaker.gui
 
-import javafx.beans.InvalidationListener
 import javafx.event.ActionEvent
 import javafx.event.EventHandler
 import javafx.fxml.FXML
@@ -14,10 +13,8 @@ import javafx.stage.Stage
 import javafx.util.Callback
 import stellaris.modmaker.*
 import java.io.File
-import javafx.beans.value.ObservableValue
 import com.sun.javafx.scene.control.skin.TableHeaderRow
 import javafx.beans.binding.Bindings
-import javafx.beans.value.ChangeListener
 import javafx.scene.control.cell.PropertyValueFactory
 import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.input.KeyCode
@@ -93,7 +90,7 @@ class Controller
         musicTabInit()
     }
     
-    fun createMod(evt: ActionEvent) = currentMod.createMod()
+    fun createMod() = currentMod.createMod()
     
     private fun addComponent(evt: ActionEvent)
     {
@@ -143,6 +140,7 @@ class Controller
         if(evt.button == MouseButton.PRIMARY)
         {
             val fileChooser = FileChooser()
+            fileChooser.initialDirectory = modDirectory.parentFile
             fileChooser.title = "Select Image"
             fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Images", "*.jpg", "*.jpeg", "*.png"))
             fileChooser.showOpenDialog(window)?.let {
@@ -153,9 +151,10 @@ class Controller
         }
     }
     
-    fun open(evt: ActionEvent)
+    fun open()
     {
         val fileChooser = FileChooser()
+        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Open Mod File"
         fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod"))
         fileChooser.showOpenDialog(window)?.let {
@@ -181,14 +180,15 @@ class Controller
         }
     }
     
-    fun save(evt: ActionEvent)
+    fun save()
     {
-        lastSaveLoc?.let {currentMod.saveMod(it)} ?: saveAs(evt)
+        lastSaveLoc?.let {currentMod.saveMod(it)} ?: saveAs()
     }
     
-    fun saveAs(evt: ActionEvent)
+    fun saveAs()
     {
         val fileChooser = FileChooser()
+        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Save Mod File"
         fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod"))
         fileChooser.showSaveDialog(window)?.let {
@@ -197,7 +197,7 @@ class Controller
         }
     }
     
-    fun closeMod(evt: ActionEvent)
+    fun closeMod()
     {
         currentMod = Mod("")
         lastSaveLoc = null
@@ -210,7 +210,7 @@ class Controller
         removeMenu.items.filter {it.isVisible}.forEach {it.fire()}
     }
     
-    fun quit(evt: ActionEvent)
+    fun quit()
     {
         window.close()
     }
@@ -228,7 +228,7 @@ class Controller
     @FXML
     lateinit private var musicVolumeColumn: TableColumn<MusicComponent.Song, Double>
     
-    fun musicTabInit()
+    private fun musicTabInit()
     {
         // prevents reordering of columns
         musicListTable.widthProperty().addListener({_, _, _ ->
@@ -248,9 +248,10 @@ class Controller
         musicVolumeColumn.setOnEditCommit {it.rowValue.volume = it.newValue}
     }
     
-    fun addSongs(evt: ActionEvent)
+    fun addSongs()
     {
         val fileChooser = FileChooser()
+        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Choose Songs"
         fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Vorbis Audio File", "*.ogg"))
         fileChooser.showOpenMultipleDialog(window)?.let {
@@ -272,11 +273,14 @@ class Controller
         init
         {
             val filter = UnaryOperator<TextFormatter.Change?> {change ->
-                val newValue = change!!.controlNewText
+                var newValue = change!!.controlNewText
+                val lastChar = if(newValue.isEmpty()) null else newValue.last().toLowerCase()
+                if(lastChar == 'e')
+                    newValue += '0'
                 val num = newValue.toDoubleOrNull()
                 if(newValue.isEmpty())
                     change
-                else if(num == null || num < 0.0)
+                else if(num == null || num < 0.0 || lastChar == 'd' || lastChar == 'f')
                     null
                 else
                     change
@@ -285,6 +289,10 @@ class Controller
             {
                 override fun fromString(string: String): Double
                 {
+                    @Suppress("NAME_SHADOWING")
+                    var string = string
+                    if(string.isNotEmpty() && string.last().toLowerCase() == 'e')
+                        string += '0'
                     return string.toDoubleOrNull() ?: item
                 }
                 
