@@ -2,6 +2,7 @@
 
 <?import javafx.geometry.Insets?>
 <?import javafx.scene.control.Button?>
+<?import javafx.scene.control.ListView?>
 <?import javafx.scene.control.Menu?>
 <?import javafx.scene.control.MenuBar?>
 <?import javafx.scene.control.MenuItem?>
@@ -144,7 +145,26 @@
                   <Tab closable="false" text="Portraits" />
                   <Tab closable="false" text="Traits" />
                   <Tab closable="false" text="System Initializers" />
-                  <Tab closable="false" text="Graphics" />
+                  <Tab closable="false" text="Loading Screens">
+                     <content>
+                        <AnchorPane prefHeight="200.0" prefWidth="200.0">
+                           <children>
+                              <VBox prefHeight="200.0" prefWidth="100.0" AnchorPane.bottomAnchor="0.0" AnchorPane.leftAnchor="0.0" AnchorPane.rightAnchor="0.0" AnchorPane.topAnchor="0.0">
+                                 <children>
+                                    <HBox prefHeight="11.0" prefWidth="740.0">
+                                       <children>
+                                          <Button mnemonicParsing="false" onAction="#addLoadingScreens" text="Add Loading Screens" />
+                                       </children>
+                                       <padding>
+                                          <Insets bottom="5.0" left="5.0" right="5.0" top="5.0" />
+                                       </padding>
+                                    </HBox>
+                                    <ListView fx:id="loadingScreenListView" onKeyReleased="#loadingScreenKeyReleased" orientation="HORIZONTAL" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS" />
+                                 </children>
+                              </VBox>
+                           </children>
+                        </AnchorPane>
+                     </content></Tab>
                   <Tab closable="false" text="Flags" />
                   <Tab closable="false" text="Prescripted Countries" />
                   <Tab closable="false" text="Ascension Perks" />

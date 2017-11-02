@@ -15,7 +15,6 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
-import java.util.*
 
 fun main(args: Array<String>)
 {
@@ -43,7 +42,7 @@ enum class ModType(val tag: String)
     PORTRAITS("Graphics"),
     TRAITS("Traits"),
     SYSTEM_INITIALIZERS("Galaxy Generation"),
-    GRAPHICS("Graphics"),
+    LOADING_SCREENS("Graphics"),
     FLAGS("Graphics"),
     PRESCRIPTED_COUNTRIES("Galaxy Generation"),
     ASCENSION_PERKS("Government"),
@@ -52,7 +51,7 @@ enum class ModType(val tag: String)
     NAME_LISTS("Species")
 }
 
-class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModType> = mutableSetOf(), val uniqueID: UUID = UUID.randomUUID())
+class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModType> = mutableSetOf())
 {
     companion object
     {
@@ -62,12 +61,11 @@ class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModT
             val name = jsonData.string("name")!!
             val folderName = jsonData.string("folderName")
             val modID = jsonData.string("modID")!!
-            val uniqueID = UUID.fromString(jsonData.string("UUID"))
             val image = if(!jsonData.isNull("image")) File(jsonData.string("image")) else null
             val supportedVersion = jsonData.string("supported version")!!
             val modType = jsonData.jsonArray("types").map {ModType.valueOf(it as String)}.toMutableSet()
             
-            val mod = Mod(name, modID, modType, uniqueID)
+            val mod = Mod(name, modID, modType)
             mod.image = image
             mod.supportedVersion = supportedVersion
             mod.folderName = folderName
@@ -112,7 +110,6 @@ class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModT
         mod["name"] = name
         mod["folderName"] = if(folderSet) folderName else null
         mod["modID"] = modID
-        mod["UUID"] = uniqueID.toString()
         mod["image"] = image?.path
         mod["supported version"] = supportedVersion
         mod["types"] = JSONArray(modType.toList().map {it.toString()})
@@ -185,7 +182,7 @@ interface ModComponent
                 ModType.PORTRAITS -> TODO()
                 ModType.TRAITS -> TODO()
                 ModType.SYSTEM_INITIALIZERS -> TODO()
-                ModType.GRAPHICS -> TODO()
+                ModType.LOADING_SCREENS -> LoadingScreenComponent(mod)
                 ModType.FLAGS -> TODO()
                 ModType.PRESCRIPTED_COUNTRIES -> TODO()
                 ModType.ASCENSION_PERKS -> TODO()
@@ -203,7 +200,7 @@ interface ModComponent
                 ModType.SPECIES -> TODO()
                 ModType.MUSIC -> {
                     val musicComponent = MusicComponent(mod)
-                    obj.jsonArray("songs").forEach { it as JSONObject
+                    obj.jsonArray("songs").forEach {it as JSONObject
                         val location = File(it.string("location"))
                         val name = it.string("name")!!
                         val volume = it.number("volume") as Double
@@ -214,7 +211,11 @@ interface ModComponent
                 ModType.PORTRAITS -> TODO()
                 ModType.TRAITS -> TODO()
                 ModType.SYSTEM_INITIALIZERS -> TODO()
-                ModType.GRAPHICS -> TODO()
+                ModType.LOADING_SCREENS -> {
+                    val loadingScreenComponent = LoadingScreenComponent(mod)
+                    loadingScreenComponent.loadingScreens.addAll(obj.jsonArray("loadingScreens").map {Controller.LoadingScreen(File(it as String))})
+                    loadingScreenComponent
+                }
                 ModType.FLAGS -> TODO()
                 ModType.PRESCRIPTED_COUNTRIES -> TODO()
                 ModType.ASCENSION_PERKS -> TODO()
@@ -231,7 +232,7 @@ interface ModComponent
     fun deleteModComponent(modLoc: File)
 }
 
-class MusicComponent(val mod: Mod): ModComponent
+class MusicComponent(private val mod: Mod): ModComponent
 {
     override val type = ModType.MUSIC
     
@@ -283,5 +284,36 @@ class MusicComponent(val mod: Mod): ModComponent
     override fun deleteModComponent(modLoc: File)
     {
         File(modLoc, "music").deleteRecursively()
+    }
+}
+
+class LoadingScreenComponent(private val mod: Mod): ModComponent
+{
+    override val type = ModType.LOADING_SCREENS
+    
+    val loadingScreens = FXCollections.observableArrayList<Controller.LoadingScreen>()!!
+    
+    private val path = "gfx/loadingscreens"
+    
+    override fun toJSON(): JSONObject
+    {
+        val component = JSONObject()
+        component["type"] = type.toString()
+        component["loadingScreens"] = JSONArray(loadingScreens.map {it.file.path})
+        return component
+    }
+    
+    override fun createModComponent(modLoc: File)
+    {
+        val loadingScreenLoc = File(modLoc, path)
+        loadingScreenLoc.deleteRecursively()
+        loadingScreenLoc.mkdirs()
+    
+        loadingScreens.forEachIndexed {index, loadingScreen ->  loadingScreen.file.copyTo(File(loadingScreenLoc, "${mod.folderName}_load_${index + 1}.${loadingScreen.file.extension}"))}
+    }
+    
+    override fun deleteModComponent(modLoc: File)
+    {
+        File(modLoc, "gfx/loadingscreens").deleteRecursively()
     }
 }

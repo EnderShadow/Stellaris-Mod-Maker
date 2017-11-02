@@ -15,12 +15,14 @@ import stellaris.modmaker.*
 import java.io.File
 import com.sun.javafx.scene.control.skin.TableHeaderRow
 import javafx.beans.binding.Bindings
+import javafx.embed.swing.SwingFXUtils
 import javafx.scene.control.cell.PropertyValueFactory
 import javafx.scene.control.cell.TextFieldTableCell
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
 import javafx.util.StringConverter
 import java.util.function.UnaryOperator
+import javax.imageio.ImageIO
 
 
 class Controller
@@ -51,8 +53,16 @@ class Controller
     private var currentMod = Mod("")
     private var lastSaveLoc: File? = null
     
+    private val fileChooser = FileChooser()
+    private val imageFilter = FileChooser.ExtensionFilter("Image File", "*.jpg", "*.jpeg", "*.png")
+    private val modMakerFilter = FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod")
+    private val musicFilter = FileChooser.ExtensionFilter("Vorbis Audio File", "*.ogg")
+    private val ddsFilter = FileChooser.ExtensionFilter("DirectDraw Surface File", "*.dds")
+    
     fun initialize()
     {
+        fileChooser.initialDirectory = modDirectory.parentFile
+        
         invisibleTabs.putAll(tabPane.tabs.drop(1).associate {it.text to it})
         tabPane.tabs.remove(1, tabPane.tabs.size)
         
@@ -88,6 +98,7 @@ class Controller
         supportedVersion.textProperty().addListener({_, _, new -> currentMod.supportedVersion = new})
         
         musicTabInit()
+        loadingScreenTabInit()
     }
     
     fun createMod() = currentMod.createMod()
@@ -109,8 +120,21 @@ class Controller
             {
                 val component = ModComponent.createComponent(type, currentMod)
                 currentMod.modComponents.add(component)
-                if(type == ModType.MUSIC)
-                    musicListTable.items = (component as MusicComponent).songs
+                when(type)
+                {
+                    ModType.SPECIES -> TODO()
+                    ModType.MUSIC -> musicListTable.items = (component as MusicComponent).songs
+                    ModType.PORTRAITS -> TODO()
+                    ModType.TRAITS -> TODO()
+                    ModType.SYSTEM_INITIALIZERS -> TODO()
+                    ModType.LOADING_SCREENS -> loadingScreenListView.items = (component as LoadingScreenComponent).loadingScreens
+                    ModType.FLAGS -> TODO()
+                    ModType.PRESCRIPTED_COUNTRIES -> TODO()
+                    ModType.ASCENSION_PERKS -> TODO()
+                    ModType.CIVICS -> TODO()
+                    ModType.TECHNOLOGY -> TODO()
+                    ModType.NAME_LISTS -> TODO()
+                }
             }
         }
     }
@@ -139,10 +163,9 @@ class Controller
     {
         if(evt.button == MouseButton.PRIMARY)
         {
-            val fileChooser = FileChooser()
-            fileChooser.initialDirectory = modDirectory.parentFile
             fileChooser.title = "Select Image"
-            fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Images", "*.jpg", "*.jpeg", "*.png"))
+            fileChooser.extensionFilters.clear()
+            fileChooser.extensionFilters.add(imageFilter)
             fileChooser.showOpenDialog(window)?.let {
                 currentMod.image = it
                 image.image = Image(it.toURI().toString())
@@ -153,10 +176,9 @@ class Controller
     
     fun open()
     {
-        val fileChooser = FileChooser()
-        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Open Mod File"
-        fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod"))
+        fileChooser.extensionFilters.clear()
+        fileChooser.extensionFilters.add(modMakerFilter)
         fileChooser.showOpenDialog(window)?.let {
             currentMod = Mod.loadMod(it)
             lastSaveLoc = it
@@ -175,6 +197,12 @@ class Controller
                     is MusicComponent -> {
                         musicListTable.items = it.songs
                     }
+                    is LoadingScreenComponent -> {
+                        loadingScreenListView.items = it.loadingScreens
+                        loadingScreenListView.items.forEach {loadingScreen ->
+                            loadingScreen.fitHeightProperty().bind(loadingScreenListView.heightProperty().subtract(21))
+                        }
+                    }
                 }
             }
         }
@@ -187,10 +215,9 @@ class Controller
     
     fun saveAs()
     {
-        val fileChooser = FileChooser()
-        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Save Mod File"
-        fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod"))
+        fileChooser.extensionFilters.clear()
+        fileChooser.extensionFilters.add(modMakerFilter)
         fileChooser.showSaveDialog(window)?.let {
             currentMod.saveMod(it)
             lastSaveLoc = it
@@ -250,10 +277,9 @@ class Controller
     
     fun addSongs()
     {
-        val fileChooser = FileChooser()
-        fileChooser.initialDirectory = modDirectory.parentFile
         fileChooser.title = "Choose Songs"
-        fileChooser.extensionFilters.add(FileChooser.ExtensionFilter("Vorbis Audio File", "*.ogg"))
+        fileChooser.extensionFilters.clear()
+        fileChooser.extensionFilters.add(musicFilter)
         fileChooser.showOpenMultipleDialog(window)?.let {
             musicListTable.items.addAll(it.map {MusicComponent.Song(it)})
         }
@@ -347,6 +373,48 @@ class Controller
         {
             super.cancelEdit()
             contentDisplay = ContentDisplay.TEXT_ONLY
+        }
+    }
+    
+    // ===========================================================================================================
+    // Loading Screen tab
+    // ===========================================================================================================
+    
+    @FXML
+    lateinit private var loadingScreenListView: ListView<LoadingScreen>
+    
+    private fun loadingScreenTabInit()
+    {
+        loadingScreenListView.selectionModel.selectionMode = SelectionMode.MULTIPLE
+    }
+    
+    fun addLoadingScreens()
+    {
+        fileChooser.title = "Choose Loading Screens"
+        fileChooser.extensionFilters.clear()
+        fileChooser.extensionFilters.add(ddsFilter)
+        fileChooser.showOpenMultipleDialog(window)?.let {
+            val imageViews = it.map {LoadingScreen(it)}
+            imageViews.forEach {
+                it.fitHeightProperty().bind(loadingScreenListView.heightProperty().subtract(21))
+            }
+            loadingScreenListView.items.addAll(imageViews)
+        }
+    }
+    
+    fun loadingScreenKeyReleased(evt: KeyEvent)
+    {
+        if(evt.code == KeyCode.DELETE)
+        {
+            loadingScreenListView.items.removeAll(loadingScreenListView.selectionModel.selectedItems)
+        }
+    }
+    
+    class LoadingScreen(val file: File): ImageView(SwingFXUtils.toFXImage(ImageIO.read(file), null))
+    {
+        init
+        {
+            isPreserveRatio = true
         }
     }
 }
