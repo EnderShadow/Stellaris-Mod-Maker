@@ -6,31 +6,23 @@ import javafx.fxml.FXML
 import javafx.scene.control.*
 import javafx.scene.image.Image
 import javafx.scene.image.ImageView
-import javafx.scene.input.MouseButton
-import javafx.scene.input.MouseEvent
 import javafx.stage.FileChooser
 import javafx.stage.Stage
-import javafx.util.Callback
 import stellaris.modmaker.*
 import java.io.File
-import com.sun.javafx.scene.control.skin.TableHeaderRow
-import javafx.beans.binding.Bindings
-import javafx.embed.swing.SwingFXUtils
-import javafx.scene.control.cell.PropertyValueFactory
-import javafx.scene.control.cell.TextFieldTableCell
-import javafx.scene.input.KeyCode
-import javafx.scene.input.KeyEvent
-import javafx.util.StringConverter
-import java.util.function.UnaryOperator
-import javax.imageio.ImageIO
+import javafx.fxml.FXMLLoader
+import javafx.scene.Parent
+import javafx.scene.input.*
 
 
 class Controller
 {
-    // Main controller and Mod Info tab
+    // Controller for the window and the Mod Info tab
     
     @FXML
     lateinit private var tabPane: TabPane
+    @FXML
+    lateinit private var tabMenu: Menu
     @FXML
     lateinit private var addMenu: Menu
     @FXML
@@ -50,45 +42,19 @@ class Controller
     lateinit private var imageBorderStyle: String
     
     private val invisibleTabs = mutableMapOf<String, Tab>()
+    private val tabControllers = mutableMapOf<String, TabController>()
     private var currentMod = Mod("")
     private var lastSaveLoc: File? = null
     
-    private val fileChooser = FileChooser()
-    private val imageFilter = FileChooser.ExtensionFilter("Image File", "*.jpg", "*.jpeg", "*.png")
-    private val modMakerFilter = FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod")
-    private val musicFilter = FileChooser.ExtensionFilter("Vorbis Audio File", "*.ogg")
-    private val ddsFilter = FileChooser.ExtensionFilter("DirectDraw Surface File", "*.dds")
+    val fileChooser = FileChooser()
+    val imageFilter = FileChooser.ExtensionFilter("Image File", "*.jpg", "*.jpeg", "*.png")
+    val modMakerFilter = FileChooser.ExtensionFilter("Stellaris Mod Maker File", "*.smod")
+    val musicFilter = FileChooser.ExtensionFilter("Vorbis Audio File", "*.ogg")
+    val ddsFilter = FileChooser.ExtensionFilter("DirectDraw Surface File", "*.dds")
     
     fun initialize()
     {
         fileChooser.initialDirectory = modDirectory.parentFile
-        
-        invisibleTabs.putAll(tabPane.tabs.drop(1).associate {it.text to it})
-        tabPane.tabs.remove(1, tabPane.tabs.size)
-        
-        invisibleTabs.keys.forEach {
-            var menuItem = MenuItem(it)
-            menuItem.onAction = EventHandler<ActionEvent> {evt -> addComponent(evt)}
-            addMenu.items.add(menuItem)
-    
-            menuItem = MenuItem(it)
-            menuItem.onAction = EventHandler<ActionEvent> {evt -> removeComponent(evt)}
-            menuItem.isVisible = false
-            removeMenu.items.add(menuItem)
-        }
-        
-        // disable unimplemented mod types
-        ModType.values().forEach {
-            try
-            {
-                ModComponent.createComponent(it, Mod(""))
-            }
-            catch(error: NotImplementedError)
-            {
-                addMenu.items.find {item -> item.text.toUpperCase().replace(' ', '_') == it.toString()}!!.isDisable = true
-            }
-            finally {} // ignore other exceptions (They aren't important here)
-        }
         
         imageBorderStyle = image.parent.style
     
@@ -97,8 +63,40 @@ class Controller
         modID.textProperty().addListener({_, _, new -> currentMod.modID = new})
         supportedVersion.textProperty().addListener({_, _, new -> currentMod.supportedVersion = new})
         
-        musicTabInit()
-        loadingScreenTabInit()
+        tabPane.selectionModel.selectedItemProperty().addListener({_, old, new ->
+            if(old != new)
+            {
+                tabMenu.items.clear()
+                if(new.text != "Mod Info")
+                    tabMenu.items.addAll(menuForTab(new.text))
+            }
+        })
+    }
+    
+    fun registerTab(fxmlPath: String, modType: ModType)
+    {
+        val loader = FXMLLoader(javaClass.getResource(fxmlPath))
+        val tabContent = loader.load<Parent>()
+        val controller = loader.getController<TabController>()
+        controller.rootController = this
+        val tab = Tab(modType.name.toLowerCase().replace('_', ' ').capitalizeEachWord(), tabContent)
+        tabControllers.put(tab.text, controller)
+        
+        invisibleTabs.put(tab.text, tab)
+        
+        var menuItem = MenuItem(tab.text)
+        menuItem.onAction = EventHandler<ActionEvent> {evt -> addComponent(evt)}
+        addMenu.items.add(menuItem)
+        
+        menuItem = MenuItem(tab.text)
+        menuItem.onAction = EventHandler<ActionEvent> {evt -> removeComponent(evt)}
+        menuItem.isVisible = false
+        removeMenu.items.add(menuItem)
+    }
+    
+    private fun menuForTab(name: String): List<MenuItem>
+    {
+        return tabControllers[name]!!.tabMenuItems()
     }
     
     fun createMod() = currentMod.createMod()
@@ -120,21 +118,7 @@ class Controller
             {
                 val component = ModComponent.createComponent(type, currentMod)
                 currentMod.modComponents.add(component)
-                when(type)
-                {
-                    ModType.SPECIES -> TODO()
-                    ModType.MUSIC -> musicListTable.items = (component as MusicComponent).songs
-                    ModType.PORTRAITS -> TODO()
-                    ModType.TRAITS -> TODO()
-                    ModType.SYSTEM_INITIALIZERS -> TODO()
-                    ModType.LOADING_SCREENS -> loadingScreenListView.items = (component as LoadingScreenComponent).loadingScreens
-                    ModType.FLAGS -> TODO()
-                    ModType.PRESCRIPTED_COUNTRIES -> TODO()
-                    ModType.ASCENSION_PERKS -> TODO()
-                    ModType.CIVICS -> TODO()
-                    ModType.TECHNOLOGY -> TODO()
-                    ModType.NAME_LISTS -> TODO()
-                }
+                tabControllers[name]!!.onModComponentAdded(component)
             }
         }
     }
@@ -180,6 +164,11 @@ class Controller
         fileChooser.extensionFilters.clear()
         fileChooser.extensionFilters.add(modMakerFilter)
         fileChooser.showOpenDialog(window)?.let {
+            // Clean up open tabs
+            currentMod = Mod("") // prevents directories from the old mod being deleted
+            removeMenu.items.filter {it.isVisible}.forEach {it.fire()}
+            
+            // Load mod from file
             currentMod = Mod.loadMod(it)
             lastSaveLoc = it
             image.parent.style = currentMod.image?.let {imageFile ->
@@ -190,21 +179,12 @@ class Controller
             modFolder.text = if(currentMod.folderSet) currentMod.folderName else ""
             modID.text = currentMod.modID
             supportedVersion.text = currentMod.supportedVersion
+            
+            // Add tabs that the mod uses
             addMenu.items.filter {ModType.valueOf(it.text.toUpperCase().replace(' ', '_')) in currentMod.modType}.forEach {it.fire()}
-            currentMod.modComponents.forEach {
-                when(it)
-                {
-                    is MusicComponent -> {
-                        musicListTable.items = it.songs
-                    }
-                    is LoadingScreenComponent -> {
-                        loadingScreenListView.items = it.loadingScreens
-                        loadingScreenListView.items.forEach {loadingScreen ->
-                            loadingScreen.fitHeightProperty().bind(loadingScreenListView.heightProperty().subtract(21))
-                        }
-                    }
-                }
-            }
+            
+            // Tells each tab controller that a mod is being opened
+            currentMod.modComponents.forEach {component -> tabPane.tabs.drop(1).forEach {tabControllers[it.text]!!.onModOpened(component)}}
         }
     }
     
@@ -240,181 +220,5 @@ class Controller
     fun quit()
     {
         window.close()
-    }
-    
-    // ===========================================================================================================
-    // Music tab
-    // ===========================================================================================================
-    
-    @FXML
-    lateinit private var musicListTable: TableView<MusicComponent.Song>
-    @FXML
-    lateinit private var musicLocationColumn: TableColumn<MusicComponent.Song, File>
-    @FXML
-    lateinit private var musicNameColumn: TableColumn<MusicComponent.Song, String>
-    @FXML
-    lateinit private var musicVolumeColumn: TableColumn<MusicComponent.Song, Double>
-    
-    private fun musicTabInit()
-    {
-        // prevents reordering of columns
-        musicListTable.widthProperty().addListener({_, _, _ ->
-            val header = musicListTable.lookup("TableHeaderRow") as TableHeaderRow
-            header.reorderingProperty().addListener({_, _, _ ->
-                header.isReordering = false
-            })
-        })
-        musicListTable.selectionModel.selectionMode = SelectionMode.MULTIPLE
-        
-        musicLocationColumn.cellValueFactory = PropertyValueFactory("songLocation")
-        musicNameColumn.cellValueFactory = PropertyValueFactory("songName")
-        musicNameColumn.cellFactory = TextFieldTableCell.forTableColumn()
-        musicNameColumn.setOnEditCommit {it.rowValue.songName = it.newValue}
-        musicVolumeColumn.cellValueFactory = PropertyValueFactory("volume")
-        musicVolumeColumn.cellFactory = Callback {DoubleEditingTableCell()}
-        musicVolumeColumn.setOnEditCommit {it.rowValue.volume = it.newValue}
-    }
-    
-    fun addSongs()
-    {
-        fileChooser.title = "Choose Songs"
-        fileChooser.extensionFilters.clear()
-        fileChooser.extensionFilters.add(musicFilter)
-        fileChooser.showOpenMultipleDialog(window)?.let {
-            musicListTable.items.addAll(it.map {MusicComponent.Song(it)})
-        }
-    }
-    
-    fun musicKeyReleased(evt: KeyEvent)
-    {
-        if(evt.code == KeyCode.DELETE)
-            musicListTable.items.removeAll(musicListTable.selectionModel.selectedItems)
-    }
-    
-    class DoubleEditingTableCell: TableCell<MusicComponent.Song, Double>()
-    {
-        private val textField = TextField()
-        private val textFormatter: TextFormatter<Double>
-        
-        init
-        {
-            val filter = UnaryOperator<TextFormatter.Change?> {change ->
-                var newValue = change!!.controlNewText
-                val lastChar = if(newValue.isEmpty()) null else newValue.last().toLowerCase()
-                if(lastChar == 'e')
-                    newValue += '0'
-                val num = newValue.toDoubleOrNull()
-                if(newValue.isEmpty())
-                    change
-                else if(num == null || num < 0.0 || lastChar == 'd' || lastChar == 'f')
-                    null
-                else
-                    change
-            }
-            val converter = object: StringConverter<Double>()
-            {
-                override fun fromString(string: String): Double
-                {
-                    @Suppress("NAME_SHADOWING")
-                    var string = string
-                    if(string.isNotEmpty() && string.last().toLowerCase() == 'e')
-                        string += '0'
-                    return string.toDoubleOrNull() ?: item
-                }
-                
-                override fun toString(value: Double?): String
-                {
-                    return value?.toString() ?: "0.0"
-                }
-            }
-            textFormatter = TextFormatter(converter, 0.0, filter)
-            textField.textFormatter = textFormatter
-            textField.addEventFilter(KeyEvent.KEY_RELEASED) {
-                if(it.code == KeyCode.ESCAPE)
-                    cancelEdit()
-            }
-            textField.onAction = EventHandler {commitEdit(converter.fromString(textField.text))}
-            textProperty().bind(Bindings.`when`(emptyProperty()).then(null as String?).otherwise(itemProperty().asString()))
-            graphic = textField
-            contentDisplay = ContentDisplay.TEXT_ONLY
-        }
-    
-        override fun updateItem(item: Double?, empty: Boolean)
-        {
-            super.updateItem(item, empty)
-            contentDisplay = if(isEditing)
-            {
-                textField.requestFocus()
-                textField.selectAll()
-                ContentDisplay.GRAPHIC_ONLY
-            }
-            else
-            {
-                ContentDisplay.TEXT_ONLY
-            }
-        }
-    
-        override fun startEdit()
-        {
-            super.startEdit()
-            textFormatter.value = item
-            contentDisplay = ContentDisplay.GRAPHIC_ONLY
-            textField.requestFocus()
-            textField.selectAll()
-        }
-    
-        override fun commitEdit(newValue: Double?)
-        {
-            super.commitEdit(newValue)
-            contentDisplay = ContentDisplay.TEXT_ONLY
-        }
-    
-        override fun cancelEdit()
-        {
-            super.cancelEdit()
-            contentDisplay = ContentDisplay.TEXT_ONLY
-        }
-    }
-    
-    // ===========================================================================================================
-    // Loading Screen tab
-    // ===========================================================================================================
-    
-    @FXML
-    lateinit private var loadingScreenListView: ListView<LoadingScreen>
-    
-    private fun loadingScreenTabInit()
-    {
-        loadingScreenListView.selectionModel.selectionMode = SelectionMode.MULTIPLE
-    }
-    
-    fun addLoadingScreens()
-    {
-        fileChooser.title = "Choose Loading Screens"
-        fileChooser.extensionFilters.clear()
-        fileChooser.extensionFilters.add(ddsFilter)
-        fileChooser.showOpenMultipleDialog(window)?.let {
-            val imageViews = it.map {LoadingScreen(it)}
-            imageViews.forEach {
-                it.fitHeightProperty().bind(loadingScreenListView.heightProperty().subtract(21))
-            }
-            loadingScreenListView.items.addAll(imageViews)
-        }
-    }
-    
-    fun loadingScreenKeyReleased(evt: KeyEvent)
-    {
-        if(evt.code == KeyCode.DELETE)
-        {
-            loadingScreenListView.items.removeAll(loadingScreenListView.selectionModel.selectedItems)
-        }
-    }
-    
-    class LoadingScreen(val file: File): ImageView(SwingFXUtils.toFXImage(ImageIO.read(file), null))
-    {
-        init
-        {
-            isPreserveRatio = true
-        }
     }
 }

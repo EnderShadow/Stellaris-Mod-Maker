@@ -10,6 +10,7 @@ import json.JSONArray
 import json.JSONObject
 import json.JSONParser
 import stellaris.modmaker.gui.Controller
+import stellaris.modmaker.gui.LoadingScreenTabController
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
@@ -31,6 +32,10 @@ class ModMaker: Application()
         controller.window = primaryStage
         primaryStage.title = "Stellaris Mod Maker"
         primaryStage.scene = Scene(root)
+        
+        controller.registerTab("MusicTab.fxml", ModType.MUSIC)
+        controller.registerTab("LoadingScreenTab.fxml", ModType.LOADING_SCREENS)
+        
         primaryStage.show()
     }
 }
@@ -213,7 +218,7 @@ interface ModComponent
                 ModType.SYSTEM_INITIALIZERS -> TODO()
                 ModType.LOADING_SCREENS -> {
                     val loadingScreenComponent = LoadingScreenComponent(mod)
-                    loadingScreenComponent.loadingScreens.addAll(obj.jsonArray("loadingScreens").map {Controller.LoadingScreen(File(it as String))})
+                    loadingScreenComponent.loadingScreens.addAll(obj.jsonArray("loadingScreens").map {LoadingScreenTabController.LoadingScreen(File(it as String))})
                     loadingScreenComponent
                 }
                 ModType.FLAGS -> TODO()
@@ -291,7 +296,7 @@ class LoadingScreenComponent(private val mod: Mod): ModComponent
 {
     override val type = ModType.LOADING_SCREENS
     
-    val loadingScreens = FXCollections.observableArrayList<Controller.LoadingScreen>()!!
+    val loadingScreens = FXCollections.observableArrayList<LoadingScreenTabController.LoadingScreen>()!!
     
     private val path = "gfx/loadingscreens"
     

@@ -18,3 +18,12 @@ val modDirectory: File
         PlatformUtil.isMac() -> File("~/Documents/Paradox Interactive/Stellaris/mod")
         else -> File("")
     }
+
+fun String.capitalizeEachWord(): String
+{
+    val chars = toCharArray()
+    for(index in chars.indices)
+        if((index == 0 || chars[index - 1].isWhitespace()) && chars[index].isLowerCase())
+            chars[index] = chars[index].toUpperCase()
+    return String(chars)
+}
