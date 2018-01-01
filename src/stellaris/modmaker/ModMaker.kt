@@ -1,7 +1,6 @@
 package stellaris.modmaker
 
 import javafx.application.Application
-import javafx.collections.FXCollections
 import javafx.fxml.FXMLLoader
 import javafx.scene.Parent
 import javafx.scene.Scene
@@ -10,12 +9,15 @@ import json.JSONArray
 import json.JSONObject
 import json.JSONParser
 import stellaris.modmaker.gui.Controller
-import stellaris.modmaker.gui.LoadingScreenTabController
+import stellaris.modmaker.gui.loading_screen.LoadingScreenComponent
+import stellaris.modmaker.gui.music.MusicComponent
 import java.io.BufferedOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.file.Files
 import java.nio.file.StandardOpenOption
+import kotlin.reflect.KClass
+import kotlin.reflect.full.*
 
 fun main(args: Array<String>)
 {
@@ -33,8 +35,8 @@ class ModMaker: Application()
         primaryStage.title = "Stellaris Mod Maker"
         primaryStage.scene = Scene(root)
         
-        controller.registerTab("MusicTab.fxml", ModType.MUSIC)
-        controller.registerTab("LoadingScreenTab.fxml", ModType.LOADING_SCREENS)
+        registerTab(controller, ModType.MUSIC, "music/MusicTab.fxml", MusicComponent::class)
+        registerTab(controller, ModType.LOADING_SCREENS, "loading_screen/LoadingScreenTab.fxml", LoadingScreenComponent::class)
         
         primaryStage.show()
     }
@@ -174,60 +176,38 @@ class Mod(var name: String, var modID: String = "", val modType: MutableSet<ModT
     }
 }
 
+fun registerTab(controller: Controller, modType: ModType, fxmlFile: String, componentClass: KClass<out ModComponent>)
+{
+    controller.registerTab(fxmlFile, modType)
+    ModComponent.registerComponent(modType, componentClass)
+}
+
 interface ModComponent
 {
     companion object
     {
-        fun createComponent(type: ModType, mod: Mod): ModComponent
+        private data class ComponentFunctions(val create: (Mod) -> ModComponent, val fromJSON: (Mod, JSONObject) -> ModComponent)
+        
+        private val componentMap = mutableMapOf<ModType, ComponentFunctions>()
+        
+        fun registerComponent(modType: ModType, componentClass: KClass<out ModComponent>)
         {
-            return when(type)
-            {
-                ModType.SPECIES -> TODO()
-                ModType.MUSIC -> MusicComponent(mod)
-                ModType.PORTRAITS -> TODO()
-                ModType.TRAITS -> TODO()
-                ModType.SYSTEM_INITIALIZERS -> TODO()
-                ModType.LOADING_SCREENS -> LoadingScreenComponent(mod)
-                ModType.FLAGS -> TODO()
-                ModType.PRESCRIPTED_COUNTRIES -> TODO()
-                ModType.ASCENSION_PERKS -> TODO()
-                ModType.CIVICS -> TODO()
-                ModType.TECHNOLOGY -> TODO()
-                ModType.NAME_LISTS -> TODO()
-            }
+            val reflectedConstructor = componentClass.primaryConstructor!!
+            val createFunc = {mod: Mod -> reflectedConstructor.call(mod)}
+            
+            val reflectedFunction = componentClass.companionObject!!.functions.find {it.name == "fromJSON"}!!
+            val companionObj = componentClass.companionObjectInstance
+            val fromJSONFunc = {mod: Mod, obj: JSONObject -> reflectedFunction.call(companionObj, mod, obj) as ModComponent}
+            
+            componentMap[modType] = ComponentFunctions(createFunc, fromJSONFunc)
         }
+        
+        fun createComponent(type: ModType, mod: Mod) = componentMap[type]!!.create(mod)
         
         fun fromJSON(mod: Mod, obj: JSONObject): ModComponent
         {
             val type = ModType.valueOf(obj.string("type")!!)
-            return when(type)
-            {
-                ModType.SPECIES -> TODO()
-                ModType.MUSIC -> {
-                    val musicComponent = MusicComponent(mod)
-                    obj.jsonArray("songs").forEach {it as JSONObject
-                        val location = File(it.string("location"))
-                        val name = it.string("name")!!
-                        val volume = it.number("volume") as Double
-                        musicComponent.songs.add(MusicComponent.Song(location, name, volume))
-                    }
-                    musicComponent
-                }
-                ModType.PORTRAITS -> TODO()
-                ModType.TRAITS -> TODO()
-                ModType.SYSTEM_INITIALIZERS -> TODO()
-                ModType.LOADING_SCREENS -> {
-                    val loadingScreenComponent = LoadingScreenComponent(mod)
-                    loadingScreenComponent.loadingScreens.addAll(obj.jsonArray("loadingScreens").map {LoadingScreenTabController.LoadingScreen(File(it as String))})
-                    loadingScreenComponent
-                }
-                ModType.FLAGS -> TODO()
-                ModType.PRESCRIPTED_COUNTRIES -> TODO()
-                ModType.ASCENSION_PERKS -> TODO()
-                ModType.CIVICS -> TODO()
-                ModType.TECHNOLOGY -> TODO()
-                ModType.NAME_LISTS -> TODO()
-            }
+            return componentMap[type]!!.fromJSON(mod, obj)
         }
     }
     
@@ -235,90 +215,4 @@ interface ModComponent
     fun toJSON(): JSONObject
     fun createModComponent(modLoc: File)
     fun deleteModComponent(modLoc: File)
-}
-
-class MusicComponent(private val mod: Mod): ModComponent
-{
-    override val type = ModType.MUSIC
-    
-    val songs = FXCollections.observableArrayList<Song>()!!
-    
-    private val path get() = "music/${mod.folderName}"
-    
-    data class Song(val songLocation: File, var songName: String = songLocation.nameWithoutExtension, var volume: Double = 0.5)
-    
-    override fun toJSON(): JSONObject
-    {
-        val component = JSONObject()
-        component["type"] = type.toString()
-        component["songs"] = JSONArray(songs.map {JSONObject(mapOf("location" to it.songLocation.path, "name" to it.songName, "volume" to it.volume))})
-        return component
-    }
-    
-    override fun createModComponent(modLoc: File)
-    {
-        val musicLoc = File(modLoc, path)
-        File(modLoc, "music").deleteRecursively()
-        musicLoc.mkdirs()
-        
-        songs.map {it.songLocation}.forEach {it.copyTo(File(musicLoc, it.name))}
-        
-        val assetFile = File(modLoc, "music/${mod.folderName}.asset")
-        assetFile.createNewFile()
-        val songFile = File(modLoc, "music/${mod.folderName}.txt")
-        songFile.createNewFile()
-        
-        val assetWriter = BufferedOutputStream(FileOutputStream(assetFile))
-        val songWriter = BufferedOutputStream(FileOutputStream(songFile))
-        for(song in songs)
-        {
-            assetWriter.write("music = {\n".toByteArray())
-            assetWriter.write("\tname = \"${song.songName}\"\n".toByteArray())
-            assetWriter.write("\tfile = \"${mod.folderName}/${song.songLocation.name}\"\n".toByteArray())
-            assetWriter.write("\tvolume = ${song.volume}\n".toByteArray())
-            assetWriter.write("}\n\n".toByteArray())
-    
-            songWriter.write("song = {\n".toByteArray())
-            songWriter.write("\tname = \"${song.songName}\"\n".toByteArray())
-            songWriter.write("}\n\n".toByteArray())
-        }
-        assetWriter.close()
-        songWriter.close()
-    }
-    
-    override fun deleteModComponent(modLoc: File)
-    {
-        File(modLoc, "music").deleteRecursively()
-    }
-}
-
-class LoadingScreenComponent(private val mod: Mod): ModComponent
-{
-    override val type = ModType.LOADING_SCREENS
-    
-    val loadingScreens = FXCollections.observableArrayList<LoadingScreenTabController.LoadingScreen>()!!
-    
-    private val path = "gfx/loadingscreens"
-    
-    override fun toJSON(): JSONObject
-    {
-        val component = JSONObject()
-        component["type"] = type.toString()
-        component["loadingScreens"] = JSONArray(loadingScreens.map {it.file.path})
-        return component
-    }
-    
-    override fun createModComponent(modLoc: File)
-    {
-        val loadingScreenLoc = File(modLoc, path)
-        loadingScreenLoc.deleteRecursively()
-        loadingScreenLoc.mkdirs()
-    
-        loadingScreens.forEachIndexed {index, loadingScreen ->  loadingScreen.file.copyTo(File(loadingScreenLoc, "${mod.folderName}_load_${index + 1}.${loadingScreen.file.extension}"))}
-    }
-    
-    override fun deleteModComponent(modLoc: File)
-    {
-        File(modLoc, "gfx/loadingscreens").deleteRecursively()
-    }
 }

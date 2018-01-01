@@ -1,4 +1,4 @@
-package stellaris.modmaker.gui
+package stellaris.modmaker.gui.loading_screen
 
 import javafx.embed.swing.SwingFXUtils
 import javafx.fxml.FXML
@@ -8,8 +8,8 @@ import javafx.scene.control.SelectionMode
 import javafx.scene.image.ImageView
 import javafx.scene.input.KeyCode
 import javafx.scene.input.KeyEvent
-import stellaris.modmaker.LoadingScreenComponent
 import stellaris.modmaker.ModComponent
+import stellaris.modmaker.gui.TabController
 import java.io.File
 import javax.imageio.ImageIO
 

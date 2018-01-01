@@ -1,4 +1,4 @@
-package stellaris.modmaker.gui
+package stellaris.modmaker.gui.music
 
 import com.sun.javafx.scene.control.skin.TableHeaderRow
 import javafx.beans.binding.Bindings
@@ -12,7 +12,7 @@ import javafx.scene.input.KeyEvent
 import javafx.util.Callback
 import javafx.util.StringConverter
 import stellaris.modmaker.ModComponent
-import stellaris.modmaker.MusicComponent
+import stellaris.modmaker.gui.TabController
 import java.io.File
 import java.util.function.UnaryOperator
 
